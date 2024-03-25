@@ -228,5 +228,54 @@ class Conv3dOpInferSymbolicShapeTest(TestBase):
         return True
 
 
+class MaskedSelectNet(paddle.nn.Layer):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x, mask):
+        out = paddle.masked_select(x, mask)
+        return out
+
+
+class MaskedSelectOpInferSymbolicShapeTest(TestBase):
+    def prepare_data(self):
+        self.cases = [
+            (
+                np.random.rand(4, 5, 6),
+                np.random.rand(4, 5, 6).astype(np.int64),
+            ),
+            (
+                np.random.rand(4, 5, 6),
+                np.random.rand(4, 5, 6).astype(np.int64),
+            ),
+        ]
+        self.expected = [
+            ['shape[S6], data[NULL]'],
+            ['shape[S6], data[NULL]'],
+        ]
+
+    def test_eval_symbolic(self):
+        net = MaskedSelectNet()
+
+        for i in range(len(self.cases)):
+            x, mask = self.cases[i]
+            x_spec = InputSpec(
+                shape=[None for _ in range(len(x.shape))], dtype='float32'
+            )
+            mask_spec = InputSpec(
+                shape=[None for _ in range(len(mask.shape))], dtype='float32'
+            )
+
+            input_spec = [x_spec, mask_spec]
+            net = apply_to_static(net, False, input_spec)
+            net.eval()
+
+            check_infer_results(
+                net, input_spec, 'pd_op.masked_select', self.expected[i]
+            )
+
+        return True
+
+
 if __name__ == '__main__':
     unittest.main()
